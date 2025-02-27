@@ -1,104 +1,88 @@
+import java.security.SecureRandom;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Scanner;
 
-public class Main {
-    public static void main(String[] args) {
+public class AESExample {
+    public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
+        
+        System.out.println("Soll (1) Verschluesseln (2) Entschluesseln werden");
+        int mode = scanner.nextInt();
+        scanner.nextLine(); //Auswahl speichern
 
-        System.out.println("Wählen Sie den Modus: (1) Verschlüsseln (2) Entschlüsseln");
-        int modus = scanner.nextInt();
-        scanner.nextLine(); // Zeilenumbruch einlesen
+        if (mode == 1) { //Verschluesselung
+            System.out.println("Klartext eingeben:");
+            String plaintext = scanner.nextLine();
 
-        if (modus == 1) {
-            System.out.println("Geben Sie den zu verschlüsselnden Text ein:");
-            String klartext = scanner.nextLine();
+            SecretKey secretKey = generateKey(); //Schluessel generieren
+            byte[] iv = generateIV(); //IV generieren
 
-            try {
-                // Schlüssel und IV generieren
-                SecretKey geheimerSchlüssel = AESUtil.generateKey(256);
-                byte[] iv = AESUtil.generateIV();
-
-                // Text verschlüsseln
-                String verschluesselterText = AESUtil.encrypt(klartext, geheimerSchlüssel, iv);
-
-                // Schlüssel und IV in Base64 kodieren
-                String base64Schluessel = Base64.getEncoder().encodeToString(geheimerSchlüssel.getEncoded());
-                String base64IV = Base64.getEncoder().encodeToString(iv);
-
-                System.out.println("Verschlüsselter Text: " + verschluesselterText);
-                System.out.println("Schlüssel (Base64): " + base64Schluessel);
-                System.out.println("IV (Base64): " + base64IV);
-            } catch (Exception e) {
-                System.err.println("Fehler bei der Verschlüsselung: " + e.getMessage());
-            }
-        } else if (modus == 2) {
-            System.out.println("Geben Sie den zu entschlüsselnden Text ein:");
-            String verschluesselterText = scanner.nextLine();
-
-            System.out.println("Geben Sie den Schlüssel (Base64) ein:");
-            String base64Schluessel = scanner.nextLine();
-
-            System.out.println("Geben Sie den IV (Base64) ein:");
-            String base64IV = scanner.nextLine();
-
-            try {
-                // Base64-kodierte Schlüssel und IV dekodieren
-                byte[] schluesselBytes = Base64.getDecoder().decode(base64Schluessel);
-                byte[] iv = Base64.getDecoder().decode(base64IV);
-
-                // Geheimen Schlüssel rekonstruieren
-                SecretKey geheimerSchlüssel = new SecretKeySpec(schluesselBytes, 0, schluesselBytes.length, "AES");
-
-                // Text entschlüsseln
-                String entschluesselterText = AESUtil.decrypt(verschluesselterText, geheimerSchlüssel, iv);
-
-                System.out.println("Entschlüsselter Text: " + entschluesselterText);
-            } catch (Exception e) {
-                System.err.println("Fehler bei der Entschlüsselung: " + e.getMessage());
-            }
+            String encryptedText = encrypt(plaintext, secretKey, iv); //den eingegeben Klartext mit Schluesseln und IV verschluesseln
+            int paddingSize = getPaddingSize(plaintext); //Padding groesse festlegen
+            
+            String encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded()); //Text zu einem String aus Buchstaben, Zahlen und Zeichen unwandeln
+            String encodedIV = Base64.getEncoder().encodeToString(iv); //IV zu einem String umwandeln
+            
+            System.out.println("Verschluesselter Text: " + encryptedText);
+            System.out.println("Schluessel (Base64): " + encodedKey);
+            System.out.println("IV (Base64): " + encodedIV);
+            System.out.println("Padding Groesse: " + paddingSize + " Bytes"); //alle Were ausgeben
+        } else if (mode == 2) { //entschluesseln
+            System.out.println("verschluesselten Text eingeben:");
+            String encryptedText = scanner.nextLine();
+            System.out.println("Schluessel (Base64) eingeben:");
+            String encodedKey = scanner.nextLine();
+            System.out.println("IV (Base64) eingeben:"); 
+            String encodedIV = scanner.nextLine();
+            
+            SecretKey secretKey = new SecretKeySpec(Base64.getDecoder().decode(encodedKey), "AES"); //Schluessel entschluesseln
+            byte[] iv = Base64.getDecoder().decode(encodedIV); //IV entschluesseln
+            
+            String decryptedText = decrypt(encryptedText, secretKey, iv); //den verschluesselten Text mit Schluessel und IV entschluesseln
+            System.out.println("Entschluesselter Text: " + decryptedText);
         } else {
-            System.out.println("Ungültige Auswahl. Bitte wählen Sie 1 oder 2.");
+            System.out.println("Ungueltige Eingabe.");
         }
-
         scanner.close();
     }
-}
-
-class AESUtil {
-    // Generiert einen AES-Schlüssel mit der angegebenen Länge
-    public static SecretKey generateKey(int n) throws Exception {
+    
+    public static SecretKey generateKey() throws Exception {
         KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
-        keyGenerator.init(n);
-        return keyGenerator.generateKey();
+        keyGenerator.init(256);
+        return keyGenerator.generateKey(); //Schluessel generieren
     }
-
-    // Generiert einen Initialisierungsvektor (IV)
+    
     public static byte[] generateIV() {
         byte[] iv = new byte[16];
         new SecureRandom().nextBytes(iv);
-        return iv;
+        return iv; //IV generieren
     }
-
-    // Verschlüsselt den Klartext mit dem gegebenen Schlüssel und IV
-    public static String encrypt(String input, SecretKey key, byte[] iv) throws Exception {
+    
+    public static String encrypt(String plaintext, SecretKey key, byte[] iv) throws Exception {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
-        byte[] cipherText = cipher.doFinal(input.getBytes());
-        return Base64.getEncoder().encodeToString(cipherText);
+        byte[] cipherText = cipher.doFinal(plaintext.getBytes());
+        return Base64.getEncoder().encodeToString(cipherText); //Padding verschluesseln
     }
-
-    // Entschlüsselt den verschlüsselten Text mit dem gegebenen Schlüssel und IV
+    
     public static String decrypt(String cipherText, SecretKey key, byte[] iv) throws Exception {
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding"); //Padding Typ festlegen
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
         byte[] plainText = cipher.doFinal(Base64.getDecoder().decode(cipherText));
+        int paddingSize = getPaddingSize(new String(plainText)); //Padding groesse errechnen
+        System.out.println("Padding Groesse: " + paddingSize + " Bytes");
         return new String(plainText);
+    }
+    
+    public static int getPaddingSize(String text) {
+        int blockSize = 16; // AES Blockgröße in Bytes
+        int paddingSize = blockSize - (text.length() % blockSize);
+        return paddingSize == blockSize ? 0 : paddingSize;
     }
 }
 //code wurde zu großen Teilen aus diesem Video von WhiteBadCodes entnommen: 
